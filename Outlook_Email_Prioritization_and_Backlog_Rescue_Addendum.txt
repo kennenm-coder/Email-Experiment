@@ -1,0 +1,1239 @@
+OUTLOOK EMAIL PRIORITIZATION AND BACKLOG RESCUE SYSTEM
+ADDENDUM FOR THE CUSTOM OUTLOOK INBOX COMMAND CENTER
+Version: 1.0
+Prepared: July 30, 2026
+
+======================================================================
+1. PURPOSE
+======================================================================
+
+This document summarizes and upgrades the email-organization system previously
+planned in June and July 2026.
+
+It is intended to be added to:
+
+Custom_Outlook_Inbox_Command_Center_Full_Build_Plan.txt
+
+The earlier planning contained two related systems:
+
+1. PRIORITY QUEUE
+   Score incoming and unresolved emails, then surface only the most important
+   emails that currently require attention.
+
+2. BACKLOG RESCUE QUEUE
+   Search ignored work folders for older unread emails and steadily surface a
+   controlled number so buried work cannot disappear indefinitely.
+
+The new custom Outlook application should implement both systems as virtual
+views. It should not physically move, flag, categorize, mark read, or modify
+messages inside Outlook.
+
+Outlook remains the mailbox and source of truth.
+The custom app owns prioritization, workflow state, and queues.
+
+======================================================================
+2. ORIGINAL SYSTEM INTENT
+======================================================================
+
+The original problem was not simply "too many emails."
+
+The actual failure modes were:
+
+- Important emails mixed with automated notices and low-value traffic.
+- Read emails being mentally treated as complete even when work remained.
+- Unread messages accumulating inside side folders that were rarely checked.
+- Important work disappearing underneath newer messages.
+- Duplicate emails and long threads consuming attention repeatedly.
+- Too many visible flags making every item feel equally urgent.
+- No controlled queue that refilled as work was completed.
+- No distinction between:
+  - Needs action
+  - Waiting on someone
+  - FYI
+  - Automated report
+  - Chatter
+  - Backlog item
+  - Duplicate thread activity
+
+The goal was to create a limited, trustworthy work queue rather than another
+large inbox.
+
+======================================================================
+3. KEY HISTORICAL DECISIONS
+======================================================================
+
+The prior plan established the following decisions:
+
+- Run an inbox audit every hour.
+- Score messages using sender, content, age, unread state, flags, and attachment
+  indicators.
+- Group emails into:
+  - Urgent
+  - Needs Reply
+  - Waiting
+  - FYI
+  - Duplicate / Existing Thread
+- Keep "Chatter" separate from operational email.
+- Surface only the top 10-20 important messages.
+- Use a limited active work queue rather than flagging everything.
+- Do not automatically remove an item from the active queue merely because time
+  passed.
+- Refill the queue as the user resolves items.
+- Search ignored work folders for older unread messages.
+- Skip non-work folders such as Sent, Drafts, Archive, Deleted, and Junk.
+- Process backlog emails oldest first.
+- The later backlog design used a Red Flag queue with a maximum capacity of 25.
+- The user later preferred an Outlook folder rather than a category for the old
+  Power Automate version.
+- The red-flag category/folder concept was also referred to as "Work Needed."
+
+The custom web app should preserve the behavior, not the old implementation
+constraint.
+
+======================================================================
+4. UPGRADED APPLICATION DESIGN
+======================================================================
+
+Create three separate virtual systems:
+
+A. PRIORITY QUEUE
+   The small list of the most important unresolved emails right now.
+
+B. BACKLOG RESCUE QUEUE
+   Older unread work emails pulled from ignored folders in a controlled refill
+   system.
+
+C. REFERENCE STREAMS
+   Chatter, FYI, newsletters, reports, and other non-action mail that should remain
+   searchable but should not crowd the action queues.
+
+These must remain separate.
+
+Do not combine the Priority Queue and Backlog Rescue Queue into one list. A new
+urgent service problem should not be displaced by a two-week-old low-value report,
+and old forgotten work should not remain invisible just because new urgent mail
+keeps arriving.
+
+======================================================================
+5. PRIORITY QUEUE
+======================================================================
+
+5.1 OBJECTIVE
+
+Maintain a short, ranked list of emails most likely to require the user's action.
+
+Default active capacity:
+10 emails
+
+Configurable range:
+10-20 emails
+
+Recommended launch value:
+10
+
+The queue should feel like a worklist, not another inbox.
+
+5.2 QUEUE ENTRY RULE
+
+An email may enter the Priority Queue when:
+
+- It is classified as Needs Action, Critical, or Needs Reply.
+- It has not been completed, ignored, snoozed, or delegated.
+- It is not a duplicate representation of another higher-value message in the same
+  thread.
+- It is not classified as Chatter, FYI, newsletter, automated noise, or report-only
+  unless a red-flag rule overrides that exclusion.
+- It has a score high enough to rank within the available queue capacity.
+
+5.3 QUEUE REMOVAL RULE
+
+Never remove an item merely because another email scored higher.
+
+Remove an item only when the user or system has a defensible state change:
+
+- User marks Completed.
+- User marks No Action Needed.
+- User moves it to Waiting on Someone.
+- User delegates it and records the owner.
+- User snoozes it.
+- User links it to a task and chooses to manage it through the task queue.
+- A verified thread reply resolves it.
+- A deterministic rule proves it was superseded by a newer message.
+- User manually removes it.
+
+This preserves the original requirement:
+No automatic unflagging.
+
+5.4 REFILL RULE
+
+When one or more queue slots become available:
+
+1. Recalculate eligible unresolved emails.
+2. Exclude messages already represented by an active thread item.
+3. Rank by priority score.
+4. Fill only the number of open slots.
+5. Record why each new item entered the queue.
+6. Do not displace existing queue items without an explicit escalation rule.
+
+5.5 ESCALATION EXCEPTION
+
+A new critical email may appear above existing items even when the queue is full.
+
+Recommended behavior:
+- Allow critical emails to exceed the target queue capacity temporarily.
+- Display an over-capacity warning.
+- Do not silently evict an existing item.
+
+Example:
+Target capacity = 10
+Current queue = 10
+New critical message arrives
+Displayed queue = 11 until the user resolves or reclassifies an item
+
+======================================================================
+6. PRIORITY SCORING ENGINE
+======================================================================
+
+6.1 BASE HISTORICAL WEIGHTS
+
+The previous plan used these starting weights:
+
++3  Email is unread
++5  Sender is boss, manager, key internal stakeholder, or key vendor
++5  Subject/body contains urgent operational language
++4  Email has remained unread for more than 24 hours
++1  Email has an attachment
++4  Email is already flagged or manually identified as work
+-5  Email is a newsletter or automated notice
+
+Operational keywords previously contemplated included:
+
+- urgent
+- issue
+- hold
+- approval
+- complaint
+
+The custom app should extend this cautiously using real mailbox samples.
+
+6.2 RECOMMENDED SCORE MODEL
+
+Start each message at 0.
+
+MESSAGE STATE
+
++3  Unread in Outlook
++2  Read but no workflow disposition exists
++4  Manually marked Needs Action
++6  Manually red-flagged
+-6  Snoozed and not yet due
+-8  Completed
+-8  No Action Needed
+-4  Waiting on Someone and follow-up is not due
+
+SENDER IMPORTANCE
+
++5  Direct manager or owner
++5  Key operational stakeholder
++4  Key vendor or corporate contact
++3  Direct report or field employee requiring support
++2  Known customer-facing contact
+-3  Automated sender
+-5  Newsletter or promotional sender
+
+CONTENT AND CLASSIFICATION
+
++8  Critical / Red Flag classification
++6  Needs Action
++5  Needs Reply
++5  Service issue
++5  Order or confirmation exception
++4  Backorder or ETA risk
++4  Approval request
++4  Complaint or escalation
++3  Scheduling conflict
++2  Finance/accounting action
+-2  FYI
+-4  Report-only
+-5  Chatter
+-6  Noise
+
+AGE
+
++1  Unresolved for more than 8 working hours
++3  Unresolved for more than 24 hours
++5  Unresolved for more than 3 business days
++7  Unresolved for more than 7 calendar days
+
+Do not stack all age values.
+Use only the highest applicable age score.
+
+RECIPIENT CONTEXT
+
++2  User is directly addressed in To
++1  User is the only recipient
+-1  User appears only in CC
+-2  Large distribution list with no direct request detected
+
+ATTACHMENTS AND IDENTIFIERS
+
++1  Has attachment
++2  Contains a recognized job, order, PO, work-order, service-order, or file number
++2  Contains a deadline
++3  Deadline is within 3 business days
++6  Deadline is today or overdue
+
+THREAD STATE
+
++2  New reply in an active Needs Action thread
++4  Reply from someone the user was waiting on
+-3  Duplicate notification already represented by a newer message
+-4  Older message superseded by a newer message in the same thread
+
+6.3 SCORE BANDS
+
+Recommended starting bands:
+
+20 or higher:
+Critical candidate
+
+13-19:
+High priority
+
+7-12:
+Medium priority
+
+1-6:
+Low priority / review later
+
+0 or lower:
+FYI, automated, chatter, noise, or suppressed
+
+The queue is rank-based, not solely threshold-based. A score does not guarantee a
+slot when many higher-scoring messages exist.
+
+6.4 SCORE EXPLANATION
+
+Every message should expose a compact explanation:
+
+Example:
+
+Priority Score: 18
+- Key vendor: +5
+- Confirmation exception: +5
+- Unread over 24 hours: +4
+- Directly addressed: +2
+- Contains PO number: +2
+
+Do not expose internal AI chain-of-thought. Display only deterministic score
+factors and short classification explanations.
+
+6.5 SCORE CALIBRATION
+
+The scoring engine must be adjustable using actual mailbox data.
+
+The previous system used a sample of approximately 240 emails to develop practical
+rules.
+
+Recommended calibration process:
+
+1. Import a representative sample.
+2. Have the user identify:
+   - Definitely important
+   - Probably important
+   - FYI
+   - Noise
+   - Waiting
+3. Run the scoring engine.
+4. Compare false positives and false negatives.
+5. Adjust weights.
+6. Promote repeated patterns into deterministic rules.
+7. Re-test before enabling automatic queue placement.
+
+======================================================================
+7. BACKLOG RESCUE QUEUE
+======================================================================
+
+7.1 OBJECTIVE
+
+Prevent unread work emails in side folders from remaining buried indefinitely.
+
+This queue is not intended to expose every old email simultaneously. It should
+surface a controlled batch, oldest first, and refill as the user processes items.
+
+7.2 HISTORICAL CAPACITY
+
+The later Power Automate plan used:
+
+Maximum backlog/red-flag capacity:
+25 emails
+
+Recommended app behavior:
+- Maintain up to 25 active Backlog Rescue items.
+- Refill only open capacity.
+- Do not add 25 new items every run.
+- Do not remove items automatically.
+
+7.3 FOLDER SCOPE
+
+The earlier plan specifically targeted side folders that accumulate and get
+ignored, while skipping the Inbox.
+
+Known work-folder examples included:
+
+- RForce Cloud
+- Customer-related folders
+- Accounting
+- Measure-related folders
+- Service
+- New Orders
+- Order Maintenance
+- Orders-related folders
+- Printer Scan-related folders
+- BirdEye-related folders
+- Signature Service
+- Office Orders
+- Attendance
+
+Folder names may change. The app must use configurable folder inclusion rather than
+hard-coded names only.
+
+7.4 EXCLUDED FOLDERS
+
+Exclude by default:
+
+- Inbox, for the original backlog-only scan
+- Sent Items
+- Drafts
+- Archive
+- Deleted Items
+- Junk Email
+- Outbox
+- Conversation History
+- RSS Feeds
+- Sync Issues
+- Any folder marked Ignore in settings
+
+The current custom app may still sync Inbox for its normal Priority Queue. The
+Inbox exclusion applies only to the Backlog Rescue scan.
+
+7.5 ELIGIBILITY
+
+A message qualifies for Backlog Rescue when:
+
+- It exists in an included work folder.
+- It is unread in Outlook.
+- It is older than the configured age threshold.
+- It is not already in the Backlog Rescue Queue.
+- It is not Completed, Ignored, Snoozed, or Waiting with a future follow-up.
+- It is not a duplicate or superseded message.
+- It is not classified as obvious noise.
+- It is not already represented by an active Priority Queue item.
+
+7.6 AGE THRESHOLD
+
+The earlier discussion used the concept:
+Unread emails older than X days.
+
+Make the threshold configurable.
+
+Recommended launch values:
+
+- Normal work folders: 2 business days
+- Automated/report folders: 5 business days
+- Chatter: excluded
+- Attendance or compliance folders: 1 business day if action is detected
+
+Do not hard-code one threshold for every folder.
+
+7.7 SELECTION ORDER
+
+When open capacity exists:
+
+1. Determine current active Backlog Rescue count.
+2. Calculate open slots:
+   openSlots = 25 - activeBacklogCount
+3. Find eligible emails.
+4. Sort oldest received date first.
+5. Apply exclusion and duplicate rules.
+6. Select only openSlots messages.
+7. Add them to the virtual Backlog Rescue Queue.
+8. Record source folder and entry reason.
+
+Historical rule:
+Oldest first.
+
+7.8 RUN FREQUENCY
+
+Historical cadence:
+Every hour
+
+Recommended app implementation:
+
+- Evaluate after each successful sync.
+- Also run hourly through the app's scheduled sync once background authentication is
+  stable.
+- Do not create a second independent process that can race the normal sync.
+- Use one database transaction or queue lock.
+
+7.9 BACKLOG ITEM DISPOSITION
+
+Available actions:
+
+- Needs Action
+- Waiting on Someone
+- Create Task
+- Red Flag
+- Completed
+- No Action Needed
+- Snooze
+- Ignore Similar Messages
+- Open in Outlook
+
+When resolved, remove it from the active Backlog Rescue Queue and refill the open
+slot during the next queue evaluation.
+
+======================================================================
+8. CHATTER
+======================================================================
+
+The user already uses a separate category or concept called:
+
+Chatter
+
+Chatter should remain separated from operational work.
+
+Default rules:
+
+- Exclude Chatter from Priority Queue.
+- Exclude Chatter from Backlog Rescue Queue.
+- Do not count Chatter against active queue capacity.
+- Keep it searchable.
+- Provide a dedicated Chatter view.
+- Permit a manual or deterministic red-flag override.
+- If Chatter contains a direct request, deadline, job number, order number, or
+  critical keyword, allow reclassification.
+
+The system should not treat all internal conversation as noise. It should treat
+Chatter as low priority unless evidence proves action is required.
+
+======================================================================
+9. THREAD AND DUPLICATE HANDLING
+======================================================================
+
+9.1 OBJECTIVE
+
+Prevent multiple messages from the same active issue from consuming multiple queue
+slots.
+
+9.2 THREAD ROLLUP
+
+Default:
+One active queue card per thread or operational issue.
+
+Display:
+- Latest sender
+- Latest subject
+- Latest received time
+- Number of messages
+- Number unread
+- Highest priority score in the thread
+- Extracted identifiers
+- Current workflow status
+
+9.3 REPRESENTATIVE MESSAGE
+
+Choose the newest actionable message as the representative item.
+
+Preserve access to:
+- Earlier messages
+- The original request
+- Latest reply
+- Outlook webLink for each message
+
+9.4 DUPLICATE RULES
+
+Treat as likely duplicate when:
+
+- Same sender
+- Same or normalized subject
+- Same job/order/PO identifier
+- Close timestamps
+- Same attachment names or report type
+- Same conversation ID
+- Same automated template
+
+Never delete duplicate records.
+Mark them as represented_by_message_id or thread_id.
+
+9.5 SUPERSEDED EMAILS
+
+A newer message may supersede an older message when:
+
+- Same operational identifier
+- Same sender or system
+- Newer report/confirmation replaces earlier version
+- Explicit words such as updated, revised, corrected, or ignore previous
+- User manually confirms supersession
+
+Superseded messages should not occupy queue slots.
+
+======================================================================
+10. WAITING ON SOMEONE
+======================================================================
+
+An email should leave the Priority Queue when the user has completed their part and
+is waiting for another person.
+
+Store:
+
+- Waiting status
+- Person or team expected to respond
+- Waiting since
+- Follow-up date
+- Related thread
+- Last outbound message if Sent Items is available
+- Last inbound response
+
+Waiting rules:
+
+- Do not keep waiting items in the main active queue unless follow-up is due.
+- Show them in a dedicated Waiting view.
+- Increase their score when follow-up becomes due.
+- Return them to Priority Queue when:
+  - Follow-up date arrives
+  - A new reply requires action
+  - User manually escalates
+- Clear or propose clearing Waiting when a verified response arrives.
+
+======================================================================
+11. MISSED READ EMAILS
+======================================================================
+
+The earlier audit design explicitly included read emails that might still require
+work.
+
+A message being read does not equal completion.
+
+Create a view:
+
+Read but Unresolved
+
+Eligibility:
+
+- Outlook isRead = true
+- No Completed or No Action Needed disposition
+- No active Waiting status
+- No linked completed task
+- Classification indicates action or reply
+- Message is not superseded or duplicate
+
+Read-but-unresolved score:
++2 baseline
+
+Increase normally for sender, urgency, age, deadlines, and operational content.
+
+This view addresses the common failure mode where an email is opened, becomes read,
+and then disappears from attention.
+
+======================================================================
+12. AUTOMATED EMAILS AND REPORTS
+======================================================================
+
+Automated messages should normally receive a negative score, but not be discarded.
+
+Classify into:
+
+- Automated Action Required
+- Automated Report
+- Automated Confirmation
+- Automated Failure/Error
+- Automated Noise
+
+Examples that should override the automated penalty:
+
+- Flow failed
+- Connection expired
+- Upload failed
+- Order rejected
+- Confirmation mismatch
+- Backorder
+- Deadline approaching
+- Approval required
+- Missing data
+- Exception report containing unresolved records
+
+A recognized failure or exception should receive operational priority even when the
+sender is automated.
+
+======================================================================
+13. VIRTUAL QUEUES INSTEAD OF OUTLOOK MOVES
+======================================================================
+
+The previous Power Automate plan physically moved messages into a Red Flag or Work
+Needed folder.
+
+Do not reproduce that behavior in the new app.
+
+Reasons:
+
+- The new application is intentionally read-only toward Outlook.
+- Moving messages can break user expectations and folder rules.
+- Outlook folder state should not become dependent on the custom app.
+- Graph write permissions would increase corporate approval and security risk.
+- Virtual queues are faster to change and easier to audit.
+
+Replace the old folder with these app views:
+
+- Priority Queue
+- Backlog Rescue
+- Critical / Red Flags
+- Needs Action
+- Waiting
+- Read but Unresolved
+- Chatter
+- Reports
+- FYI
+- Completed
+
+The user should experience the same controlled worklist without mailbox mutation.
+
+======================================================================
+14. DATA MODEL ADDITIONS
+======================================================================
+
+Add or confirm the following fields.
+
+14.1 email_workflow_state
+
+Add:
+
+- in_priority_queue boolean default false
+- priority_queue_entered_at timestamptz
+- priority_queue_position integer
+- priority_queue_reason text
+- in_backlog_rescue boolean default false
+- backlog_entered_at timestamptz
+- backlog_source_folder text
+- backlog_entry_reason text
+- waiting_since timestamptz
+- follow_up_at timestamptz
+- completed_at timestamptz
+- no_action_needed_at timestamptz
+- delegated_to text
+- delegated_at timestamptz
+- represented_by_message_id uuid nullable
+- superseded_by_message_id uuid nullable
+
+14.2 email_priority_scores
+
+Create table:
+
+- id uuid primary key
+- user_id uuid not null
+- email_message_id uuid not null
+- total_score integer not null
+- score_version text not null
+- factors jsonb not null
+- eligible_for_priority boolean
+- calculated_at timestamptz
+- source_hash text
+
+Unique current score:
+(user_id, email_message_id, score_version, source_hash)
+
+Example factors:
+
+[
+  {
+    "code": "KEY_VENDOR",
+    "label": "Key vendor",
+    "points": 5
+  },
+  {
+    "code": "UNREAD_OVER_24H",
+    "label": "Unread over 24 hours",
+    "points": 4
+  }
+]
+
+14.3 queue_settings
+
+Create table:
+
+- id uuid primary key
+- user_id uuid unique not null
+- priority_target_capacity integer default 10
+- priority_max_capacity integer default 20
+- backlog_capacity integer default 25
+- backlog_default_age_business_days integer default 2
+- hourly_evaluation_enabled boolean default true
+- chatter_excluded boolean default true
+- auto_add_critical boolean default true
+- created_at timestamptz
+- updated_at timestamptz
+
+14.4 folder_scan_settings
+
+Create table:
+
+- id uuid primary key
+- user_id uuid not null
+- graph_folder_id text not null
+- folder_name text not null
+- include_in_priority_scan boolean default true
+- include_in_backlog_scan boolean default false
+- backlog_age_business_days integer nullable
+- folder_type text
+- ignored boolean default false
+- created_at timestamptz
+- updated_at timestamptz
+
+Unique:
+(user_id, graph_folder_id)
+
+======================================================================
+15. QUEUE EVALUATION ALGORITHM
+======================================================================
+
+15.1 PRIORITY QUEUE PSEUDOCODE
+
+function evaluatePriorityQueue(userId):
+    acquireQueueLock(userId)
+
+    existing = getActivePriorityItems(userId)
+    existing = removeOnlyExplicitlyResolvedItems(existing)
+
+    eligible = getEligibleUnresolvedMessages(userId)
+
+    for each message in eligible:
+        score = calculatePriorityScore(message)
+        saveScore(message, score)
+
+    collapseDuplicatesAndThreads(eligible)
+
+    critical = eligible where score is critical and not already queued
+    addAllCriticalWithoutEvictingExisting(critical)
+
+    openSlots = targetCapacity - count(nonCriticalActiveItems)
+
+    if openSlots > 0:
+        candidates = eligible
+            excluding already queued
+            excluding waiting not due
+            excluding snoozed
+            excluding chatter
+            excluding reports/noise
+            order by score desc, received_at asc
+
+        add first openSlots candidates
+
+    saveQueuePositions()
+    releaseQueueLock()
+
+15.2 BACKLOG RESCUE PSEUDOCODE
+
+function evaluateBacklogRescue(userId):
+    acquireQueueLock(userId)
+
+    activeCount = countActiveBacklogItems(userId)
+    openSlots = backlogCapacity - activeCount
+
+    if openSlots <= 0:
+        releaseQueueLock()
+        return
+
+    eligible = getUnreadMessagesFromIncludedBacklogFolders(userId)
+        excluding Inbox
+        excluding system/non-work folders
+        excluding already queued
+        excluding completed
+        excluding waiting not due
+        excluding snoozed
+        excluding chatter
+        excluding obvious noise
+        excluding duplicate/superseded
+        excluding represented in Priority Queue
+        where age exceeds folder threshold
+        order by received_at asc
+
+    selected = first openSlots eligible
+
+    for each message in selected:
+        addToBacklogRescue(message)
+        record folder and entry reason
+
+    releaseQueueLock()
+
+15.3 TRANSACTION RULE
+
+Queue evaluation must be idempotent.
+
+The same message must not be inserted twice due to:
+
+- Hourly evaluation
+- Manual refresh
+- Multiple browser tabs
+- Webhook delivery
+- Vercel retry
+- Cron retry
+
+Use unique constraints and a per-user evaluation lock.
+
+======================================================================
+16. APPLICATION VIEWS
+======================================================================
+
+16.1 TODAY / COMMAND CENTER
+
+Show:
+
+- Critical count
+- Priority Queue count
+- Backlog Rescue count
+- Waiting follow-ups due
+- Read but Unresolved count
+- New unclassified messages
+
+Sections:
+
+1. Critical
+2. Priority Queue
+3. Waiting Due
+4. Backlog Rescue
+5. Recently Completed
+
+16.2 PRIORITY QUEUE VIEW
+
+Sort:
+
+1. Critical manual red flags
+2. Score descending
+3. Oldest unresolved first when scores tie
+
+Show score explanation.
+
+16.3 BACKLOG RESCUE VIEW
+
+Sort oldest first.
+
+Show:
+
+- Source folder
+- Days old
+- Sender
+- Subject
+- Why it entered
+- Classification
+- Open in Outlook
+- Resolve actions
+
+16.4 READ BUT UNRESOLVED VIEW
+
+Sort by score descending, then age descending.
+
+16.5 CHATTER VIEW
+
+Separate stream with no queue capacity impact.
+
+16.6 MISSED OR AGING VIEW
+
+Show:
+
+- Unread over 24 hours
+- Unresolved over 3 business days
+- Waiting follow-up overdue
+- Read but unresolved
+- Backlog eligible but queue full
+
+======================================================================
+17. SETTINGS
+======================================================================
+
+Provide settings for:
+
+Priority Queue
+- Target capacity
+- Maximum displayed capacity
+- Critical overflow behavior
+- Minimum score
+- Included categories
+
+Backlog Rescue
+- Capacity
+- Included folders
+- Folder-specific age thresholds
+- Oldest-first behavior
+- Excluded classifications
+
+Scoring
+- Important senders
+- Important domains
+- Key phrases
+- Negative phrases
+- Automated senders
+- Age weights
+- Deadline weights
+- Attachment weight
+
+Streams
+- Chatter category/folder mapping
+- Report senders
+- Newsletter senders
+- Known automated systems
+
+Notifications
+- Notify only for critical
+- Daily summary
+- Queue refill summary
+- Waiting follow-up reminder
+
+Do not expose every scoring weight on the primary settings page. Place advanced
+weights under an Advanced section.
+
+======================================================================
+18. USER ACTIONS AND STATE TRANSITIONS
+======================================================================
+
+UNCLASSIFIED
+-> Needs Action
+-> Waiting
+-> FYI
+-> Chatter
+-> No Action Needed
+-> Completed
+
+NEEDS ACTION
+-> Priority Queue
+-> Create Task
+-> Waiting
+-> Delegated
+-> Snoozed
+-> Completed
+
+BACKLOG RESCUE
+-> Needs Action
+-> Priority Queue
+-> Create Task
+-> Waiting
+-> No Action Needed
+-> Completed
+-> Ignore Similar
+
+WAITING
+-> Follow-up Due
+-> Priority Queue
+-> Completed
+-> Still Waiting
+
+SNOOZED
+-> Returns when snooze expires
+-> Completed
+-> Waiting
+
+CRITICAL
+-> Remains visible until explicitly resolved
+-> May exceed queue target
+-> Cannot be automatically downgraded by AI
+
+======================================================================
+19. NOTIFICATIONS
+======================================================================
+
+The original design focused on organization, not constant interruption.
+
+Recommended notification policy:
+
+Immediate:
+- Critical message only
+- New reply on a critical waiting item
+- Overdue deadline
+- Automation failure affecting operations
+
+Hourly:
+- No notification unless the critical state changed
+
+Daily summary:
+- Priority Queue count
+- New items added
+- Backlog items surfaced
+- Waiting follow-ups due
+- Oldest unresolved item
+- Read-but-unresolved count
+
+Do not notify for every queue refill.
+
+======================================================================
+20. ACCEPTANCE TESTS
+======================================================================
+
+PRIORITY QUEUE
+
+[ ] Target capacity defaults to 10.
+[ ] Capacity can be configured from 10 to 20.
+[ ] Existing active items are not silently evicted.
+[ ] Critical items may overflow capacity.
+[ ] Completed items leave the queue.
+[ ] Waiting items leave unless follow-up is due.
+[ ] Snoozed items leave until the snooze expires.
+[ ] The queue refills only available slots.
+[ ] No automatic unflagging occurs.
+[ ] Every score has visible factors.
+[ ] Manual priority overrides AI and rules.
+
+BACKLOG RESCUE
+
+[ ] Default capacity is 25.
+[ ] Current active count is checked before refill.
+[ ] Only enough items are added to reach capacity.
+[ ] Included side folders are configurable.
+[ ] Inbox is excluded from the backlog scan.
+[ ] Sent, Drafts, Archive, Deleted, and Junk are excluded.
+[ ] Eligible messages are processed oldest first.
+[ ] Folder-specific age thresholds work.
+[ ] Chatter is excluded.
+[ ] Duplicate and superseded messages do not consume slots.
+[ ] Resolved items leave and open slots refill.
+[ ] Outlook messages are not physically moved.
+
+THREADS
+
+[ ] One issue/thread normally consumes one queue slot.
+[ ] New replies update the representative card.
+[ ] Older superseded emails remain accessible.
+[ ] Duplicate automated notifications collapse correctly.
+
+READ BUT UNRESOLVED
+
+[ ] Read status alone never marks work complete.
+[ ] Read actionable email appears in the unresolved view.
+[ ] Completing or dismissing it removes it.
+
+SCORING
+
+[ ] Historical base weights are implemented as configurable defaults.
+[ ] Key sender scoring works.
+[ ] Urgency language scoring works.
+[ ] Unread-age scoring works.
+[ ] Automated/newsletter penalty works.
+[ ] Automated failure messages override the penalty.
+[ ] Score recalculation is idempotent.
+[ ] Repeated manual corrections can become rules.
+
+SECURITY AND READ-ONLY BEHAVIOR
+
+[ ] No Mail.ReadWrite permission is requested.
+[ ] No message is moved.
+[ ] No Outlook flag or category is changed.
+[ ] No Outlook read/unread status is changed.
+[ ] All queue state exists only in the app database.
+[ ] Open in Outlook uses the Graph-provided webLink.
+
+======================================================================
+21. IMPLEMENTATION ORDER
+======================================================================
+
+Add this system to the main project in this order:
+
+1. Finish basic Microsoft Graph read-only inbox sync.
+2. Add custom workflow states.
+3. Add deterministic classifications.
+4. Add priority score table and scoring engine.
+5. Build Priority Queue with target capacity 10.
+6. Add explicit resolution and refill logic.
+7. Add folder discovery and folder scan settings.
+8. Add Backlog Rescue with capacity 25.
+9. Add Chatter exclusions.
+10. Add Read but Unresolved view.
+11. Add thread/duplicate rollups.
+12. Add waiting follow-up logic.
+13. Add daily summary.
+14. Calibrate scoring against real mailbox samples.
+15. Add AI only after deterministic logic is stable and company approval exists.
+
+======================================================================
+22. CODING AGENT ASSIGNMENT
+======================================================================
+
+"Add the Email Prioritization and Backlog Rescue system to the existing custom
+Outlook Inbox Command Center.
+
+The application must remain read-only toward Microsoft Graph. Do not move, flag,
+categorize, mark read, delete, or modify Outlook messages.
+
+Implement two independent virtual queues:
+
+1. Priority Queue
+   - Default target capacity: 10
+   - Configurable range: 10-20
+   - Rank eligible unresolved emails using deterministic priority scoring
+   - Never automatically remove an active item
+   - Refill only open slots when items are explicitly resolved, moved to Waiting,
+     snoozed, delegated, or completed
+   - Allow critical messages to exceed capacity without evicting existing items
+
+2. Backlog Rescue Queue
+   - Capacity: 25
+   - Scan only user-configured work side folders
+   - Exclude Inbox from this backlog scan
+   - Exclude Sent, Drafts, Archive, Deleted, Junk, and ignored folders
+   - Select unread emails older than each folder's configured threshold
+   - Process oldest first
+   - Add only enough messages to refill open capacity
+   - Never automatically remove active items
+   - Exclude Chatter, obvious noise, duplicates, superseded messages, and messages
+     already represented in Priority Queue
+
+Implement the historical starting score factors:
++3 unread
++5 key sender
++5 urgent/issue/hold/approval/complaint
++4 unread over 24 hours
++1 attachment
++4 manually flagged/work needed
+-5 newsletter/automated notice
+
+Add the expanded scoring factors defined in the addendum, but keep every weight
+configurable and expose a human-readable score explanation.
+
+Create the required database migrations for score history, queue settings, folder
+scan settings, queue membership, waiting/follow-up dates, duplicate representation,
+and supersession.
+
+Add these views:
+- Command Center
+- Priority Queue
+- Backlog Rescue
+- Waiting
+- Read but Unresolved
+- Chatter
+- Critical / Red Flags
+- Completed
+
+Use database locks and unique constraints so hourly syncs, manual refreshes,
+multiple tabs, cron calls, and webhook calls cannot duplicate queue membership.
+
+Do not add AI until the deterministic system passes all acceptance tests."
+
+======================================================================
+23. FINAL SYSTEM PRINCIPLE
+======================================================================
+
+The system is successful when the user does not need to scan every folder to know
+what matters.
+
+It should answer four questions immediately:
+
+1. What must I handle now?
+2. What am I waiting on?
+3. What old work is being forgotten?
+4. What can safely be ignored?
+
+The queue must stay small enough to trust.
+The backlog must surface gradually enough to finish.
+Read status must never be mistaken for completed work.
+Outlook must remain unchanged and authoritative.
+
+======================================================================
+END OF ADDENDUM
+======================================================================
