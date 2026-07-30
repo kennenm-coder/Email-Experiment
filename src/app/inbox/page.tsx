@@ -1,6 +1,7 @@
-import { auth, signOut } from "@/lib/auth/config";
+import { auth } from "@/lib/auth/config";
 import { redirect } from "next/navigation";
 import { fetchInboxMessages } from "@/lib/graph/messages";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import type { GraphMessage } from "@/lib/graph/types";
 
 function formatTime(dateString: string): string {
@@ -158,19 +159,7 @@ export default async function InboxPage() {
             Phase 0 — Permission Proof ({messages.length} messages loaded)
           </p>
         </div>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/" });
-          }}
-        >
-          <button
-            type="submit"
-            className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            Sign out
-          </button>
-        </form>
+        <SignOutButton />
       </header>
 
       <main className="flex-1 overflow-y-auto">

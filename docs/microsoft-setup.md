@@ -11,7 +11,7 @@ Go to [https://entra.microsoft.com](https://entra.microsoft.com) and sign in wit
 3. Fill in:
    - **Name**: `Inbox Command Center`
    - **Supported account types**: Select **"Accounts in this organizational directory only"** (single tenant)
-   - **Redirect URI**: Select **Web**, enter `http://localhost:3000/api/auth/callback/microsoft-entra-id`
+   - **Redirect URI**: Select **Web**, enter `http://localhost:3939/api/auth/callback/microsoft-entra-id`
 4. Click **Register**
 
 ## Step 3: Note the IDs

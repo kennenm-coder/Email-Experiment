@@ -46,7 +46,7 @@ npx auth secret
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and sign in with your Microsoft work account.
+Open [http://localhost:3939](http://localhost:3939) and sign in with your Microsoft work account.
 
 ## Permissions
 
